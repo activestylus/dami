@@ -1,0 +1,69 @@
+# File: ./lib/dami/query/enumerable.rb
+
+# frozen_string_literal: true
+
+module Dami
+  module Query
+    module Enumerable
+      def each(&block)
+        to_a.each(&block)
+      end
+
+      def to_a
+        query_structure = build_query_structure
+        records = adapter.query_records(query_structure)
+        proxies = records.map { |r| ::Dami::RecordProxy.new(@model_name, r) }
+        @preload.empty? ? proxies : adapter.preload_associations(proxies, @preload)
+      end
+      alias_method :all, :to_a
+
+      def find(id)
+        # This is a specific type of query execution, so it belongs here.
+        record = adapter.find_record(@model_name, id)
+        record ? ::Dami::RecordProxy.new(@model_name, record) : nil
+      end
+
+      def find_each(batch_size: 1000, &block)
+        find_in_batches(batch_size: batch_size) do |batch|
+          batch.each(&block)
+        end
+      end
+      
+      def find_in_batches(batch_size: 1000)
+        query = @order_by ? self : order(:id)
+        offset = 0
+        loop do
+          records = query.limit(batch_size).offset(offset).to_a
+          break if records.empty?
+          yield records
+          break if records.length < batch_size
+          offset += records.length
+        end
+      end
+
+      def first
+        limit(1).to_a.first
+      end
+
+      def last
+        # This will now work because its helper is in the same module.
+        reverse_order_query.first
+      end
+
+      def any?
+        adapter.query_exists?(build_query_structure)
+      end
+
+      def exists?(conds = nil)
+        conds ? where(conds).any? : any?
+      end
+
+      def count
+        # A more optimized version could do a SQL COUNT(*), but this works for now.
+        to_a.length
+      end
+      alias_method :length, :count
+      alias_method :size, :count
+    end
+  end
+end

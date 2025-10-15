@@ -1,0 +1,10 @@
+#!/usr/bin/env ruby
+
+# This makes sure the local `lib` directory is on the load path, which is
+# essential for development before the gem is installed.
+$LOAD_PATH.unshift File.expand_path('../lib', __dir__)
+
+require 'dami/cli'
+
+# Start the Thor command-line interface, passing it the user's arguments.
+Dami::CLI.start(ARGV)
