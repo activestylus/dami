@@ -10,52 +10,77 @@ module Dami
           raise ::Dami::ValidationError.new("Validation failed", draft.errors) unless draft.valid?
           attributes = draft.data
         end
-        permit = attributes.delete(:permit) || []
-        protect = attributes.key?(:protect) ? attributes.delete(:protect) : true
-        model_config = Dami.find_model(@model_name)
-        known_fields = (model_config[:fields] || {}).keys + (model_config[:virtual_fields] || {}).keys + [:id]
-        unknown = attributes.keys - known_fields
-        raise Dami::UnknownFieldsError.new("Unknown fields: #{unknown.join(', ')}", unknown) unless unknown.empty?
-        Dami.validate!(@model_name, attributes, on: :create)
-        filtered_attrs = Dami.filter_input!(@model_name, attributes, permit: permit, protect: protect)
-        virtual_fields = (model_config[:virtual_fields] || {}).keys
-        db_attrs = filtered_attrs.reject { |k, _| virtual_fields.include?(k) }
-        return if db_attrs.empty?
-        record = adapter.insert_record(@model_name, db_attrs)
-        ::Dami::RecordProxy.new(@model_name, record)
-      end
-      def create_many(records)
-        return if records.empty?
-        adapter.insert_many(@model_name, records)
+        prepared = _prepare_persistence(attributes, :create)
+        return nil if prepared[:db_parent_attrs].empty? && prepared[:nested_attributes].empty?
+        parent_proxy = nil
+        adapter.transaction do
+          parent_record_hash = adapter.insert_record(@model_name, prepared[:db_parent_attrs])
+          parent_proxy = ::Dami::RecordProxy.new(@model_name, parent_record_hash)
+          if prepared[:nested_attributes].any?
+            processor = ::Dami::Plugins::NestedAttributes::Processor.new(@model_name, parent_proxy, prepared[:nested_attributes], prepared[:persistence_opts])
+            processor.process
+          end
+        end
+        parent_proxy ? find(parent_proxy[:id]) : nil
       end
       def update(attrs = {}, **options, &block)
+        original_record = self.first
+        return nil unless original_record
         attributes = attrs.merge(options)
-        original_record = self.to_a.first
         if block_given?
-          return nil unless original_record
           draft = ::Dami::Draft.new(original: original_record.to_h, data: attributes)
           yield(draft)
           return nil unless draft.valid?
           attributes = draft.data
         end
-        return find(original_record[:id]) if attributes.empty? && original_record
-        permit = attributes.delete(:permit) || []
-        protect = attributes.key?(:protect) ? attributes.delete(:protect) : true
-        model_config = Dami.find_model(@model_name)
-        known_fields = (model_config[:fields] || {}).keys + (model_config[:virtual_fields] || {}).keys + [:id]
-        unknown = attributes.keys - known_fields
-        raise Dami::UnknownFieldsError.new("Unknown fields: #{unknown.join(', ')}", unknown) unless unknown.empty?
-        Dami.validate!(@model_name, attributes, on: :update)
-        filtered_attrs = Dami.filter_input!(@model_name, attributes, permit: permit, protect: protect)
-        virtual_fields = (model_config[:virtual_fields] || {}).keys
-        db_attrs = filtered_attrs.reject { |k, _| virtual_fields.include?(k) }
-        return find(original_record[:id]) if db_attrs.empty?
-        adapter.update_records(build_query_structure, db_attrs)
-        find(original_record[:id]) if original_record
+        return original_record if attributes.empty?
+        prepared = _prepare_persistence(attributes, :update, original_record)
+        adapter.transaction do
+          adapter.update_records(build_query_structure, prepared[:db_parent_attrs]) if prepared[:db_parent_attrs].any?
+          if prepared[:nested_attributes].any?
+            processor = ::Dami::Plugins::NestedAttributes::Processor.new(@model_name, original_record, prepared[:nested_attributes], prepared[:persistence_opts])
+            processor.process
+          end
+        end
+        find(original_record[:id])
+      end
+      def create_many(records)
+        return if records.empty?
+        adapter.insert_many(@model_name, records)
       end
       def delete
         adapter.delete_records(build_query_structure)
       end
+      private
+
+def _prepare_persistence(attributes, operation, parent_record = nil)
+  persistence_opts = {
+    permit: attributes.delete(:permit) || [],
+    protect: attributes.key?(:protect) ? attributes.delete(:protect) : true
+  }
+  model_config = Dami.find_model(@model_name)
+  parent_attributes = attributes.dup
+  nested_attributes = (model_config[:nests] || {}).keys.each_with_object({}) do |key, hash|
+    hash[key] = parent_attributes.delete(key) if parent_attributes.key?(key)
+  end
+  all_errors = {}
+  if nested_attributes.any?
+    processor = ::Dami::Plugins::NestedAttributes::Processor.new(@model_name, parent_record, nested_attributes, persistence_opts)
+    nested_errors = processor.validate
+    nested_errors.each do |nested_attr_key, nested_error_value|
+      all_errors[nested_attr_key] = nested_error_value
+    end
+  end
+  begin
+    Dami.validate!(@model_name, parent_attributes, on: operation)
+  rescue Dami::ValidationError => e
+    all_errors.merge!(e.errors)
+  end
+  raise Dami::ValidationError.new("Validation failed", all_errors) unless all_errors.empty?
+  filtered_parent_attrs = Dami.filter_input!(@model_name, parent_attributes, **persistence_opts)
+  db_parent_attrs = filtered_parent_attrs.reject { |k, _| (model_config[:virtual_fields] || {}).key?(k) }
+  { db_parent_attrs: db_parent_attrs, nested_attributes: nested_attributes, persistence_opts: persistence_opts }
+end
     end
   end
 end

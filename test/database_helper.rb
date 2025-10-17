@@ -43,9 +43,11 @@ module DatabaseHelper
     db.execute("CREATE TABLE tags (id #{pk}, name TEXT);")
     db.execute("CREATE TABLE posts_tags (id #{pk}, post_id INTEGER, tag_id INTEGER);")
     db.execute("CREATE TABLE articles (id #{pk}, name TEXT);")
-    db.execute("CREATE TABLE comments (id #{pk}, content TEXT, commentable_id INTEGER, commentable_type TEXT);")
+    db.execute("CREATE TABLE comments (id #{pk}, content TEXT, commentable_id INTEGER, commentable_type TEXT, post_id INTEGER, sticky BOOLEAN);") # ADDED sticky
+    db.execute("CREATE TABLE attachments (id #{pk}, comment_id INTEGER, filename TEXT);")
     db.execute("CREATE INDEX IF NOT EXISTS idx_comments_on_commentable ON comments (commentable_type, commentable_id);")
   end
+
 
   def self.drop_all_tables(db)
     case adapter_name

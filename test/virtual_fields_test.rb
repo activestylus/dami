@@ -31,6 +31,33 @@ class VirtualFieldsTest < Minitest::Test
     assert_equal 'test@example.com', user[:email]
   end
   
+  def test_multiple_conditionals
+    Dami.model :users do
+      fields do
+        field :email, :string
+        field :account_type, :string
+        field :ssn, :string
+      end
+      
+      validate do
+        rule :email, :required
+        rule :ssn, :required, when: { account_type: 'business' }
+        rule :ssn, format: /^\d{3}-\d{2}-\d{4}$/, if: ->(attrs) { attrs[:ssn] }
+      end
+    end
+    
+    # Business with invalid SSN format
+    error = assert_raises(Dami::ValidationError) do
+      @db[:users].create(
+        email: 'test@example.com',
+        account_type: 'business',
+        ssn: 'invalid'
+      )
+    end
+    
+    # THE FIX: Check for the specific error message.
+    assert_includes error.errors[:ssn], "has invalid format"
+  end
   # Test 2: Virtual fields filtered from database
   def test_virtual_fields_not_in_database
     Dami.model :users do

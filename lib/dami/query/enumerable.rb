@@ -1,7 +1,4 @@
-# File: ./lib/dami/query/enumerable.rb
-
 # frozen_string_literal: true
-
 module Dami
   module Query
     module Enumerable
@@ -18,7 +15,6 @@ module Dami
       alias_method :all, :to_a
 
       def find(id)
-        # This is a specific type of query execution, so it belongs here.
         record = adapter.find_record(@model_name, id)
         record ? ::Dami::RecordProxy.new(@model_name, record) : nil
       end
@@ -46,7 +42,6 @@ module Dami
       end
 
       def last
-        # This will now work because its helper is in the same module.
         reverse_order_query.first
       end
 
@@ -58,9 +53,9 @@ module Dami
         conds ? where(conds).any? : any?
       end
 
+      # This is the updated method
       def count
-        # A more optimized version could do a SQL COUNT(*), but this works for now.
-        to_a.length
+        adapter.count_records(build_query_structure)
       end
       alias_method :length, :count
       alias_method :size, :count

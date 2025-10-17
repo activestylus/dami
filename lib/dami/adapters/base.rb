@@ -27,6 +27,7 @@ module Dami
       def last_insert_row_id; raise NotImplementedError; end
       def find_record(model_name, id); raise NotImplementedError; end
       def query_records(query); raise NotImplementedError; end
+      def count_records(query); raise NotImplementedError; end
       def insert_record(model_name, data); raise NotImplementedError; end
       def insert_many(model_name, records); raise NotImplementedError; end
       def update_records(query, data); raise NotImplementedError; end

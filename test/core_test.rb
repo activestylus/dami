@@ -23,7 +23,35 @@ class CoreTest < Minitest::Test
   # No teardown needed, the helper handles it.
 
   # --- EXISTING TESTS (UNMODIFIED) ---
+  # In File: ./test/core_test.rb (inside the CoreTest class)
 
+  def test_where_with_not_in_empty_array_returns_all
+    user1 = @db[:users].create(name: 'Alice')
+    user2 = @db[:users].create(name: 'Bob')
+
+    # This should be interpreted as "WHERE id NOT IN ()", which is always true.
+    results = @db[:users].where(id: { not_in: [] }).to_a
+    assert_equal 2, results.length, "A 'not_in' with an empty array should return all records"
+  end
+
+
+  def test_where_with_boolean_values
+    published_post = @db[:posts].create(title: 'Published Post', published: true, user_id: 1)
+    draft_post = @db[:posts].create(title: 'Draft Post', published: false, user_id: 1)
+
+    results = @db[:posts].where(published: true).to_a
+    assert_equal 1, results.length
+    assert_equal published_post[:id], results.first[:id]
+  end
+
+  def test_where_with_not_nil_generates_is_not_null
+    @db[:users].create(name: 'Alice', email: 'alice@example.com')
+    @db[:users].create(name: 'Bob', email: nil)
+    
+    results = @db[:users].where(email: { not: nil }).to_a
+    assert_equal 1, results.length
+    assert_equal 'Alice', results.first[:name]
+  end
   def test_crud_cycle
     created = @db[:users].create(name: 'Alice', email: 'alice@example.com')
     assert_instance_of Dami::RecordProxy, created

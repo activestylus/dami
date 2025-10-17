@@ -1,5 +1,86 @@
 # Changelog
 
+## [1.0.0] - 2025-10-17
+
+This is the official first major release of the Dami ORM. It includes a complete feature set for building robust applications, significant performance optimizations, and a hardened codebase.
+
+### ✨ New Features
+
+* **Nested Attributes:** Implemented a powerful and secure way to manage associated records through a parent record.
+    * New `nests` DSL in models to explicitly allow nested operations (e.g., `nests :comments, allow_destroy: true`).
+    * Supports deep, recursive nesting for grandchildren and beyond.
+    * Handles creating, updating, and destroying nested records via `_attributes` keys (`comments_attributes`).
+    * All operations are wrapped in a single, atomic database transaction.
+    * Fully integrated with Dami's validation and protection layers, ensuring child records respect their own rules.
+
+* **Resilient Flows:** The `perform` step in the Flow DSL is now robust for handling unreliable external actions.
+    * Added a `:retry_options` parameter to `perform` (e.g., `retry_options: { on: [ApiError], times: 2 }`).
+    * Added a `:timeout` parameter to automatically fail a step that takes too long.
+
+* **Custom Inflector:** Introduced a dependency-free internal inflector (`Dami::Inflector`) to handle pluralization and singularization, removing the need for external gems like Active Support.
+
+### 🚀 Performance
+
+A major focus of this release was optimizing the performance of association loading to be competitive with leading ORMs.
+
+* **Optimized `.count` Method:** The `.count` method now executes a highly efficient `SELECT COUNT(*)` database query instead of loading all records into memory, resulting in a **~1.13x speed improvement** for counting operations.
+
+* **Preload Optimization (~85% Improvement):** The performance of eager loading (`.preload`) has been massively improved through two key architectural changes:
+    1.  **Flyweight Pattern:** Replaced per-instance method definition on `RecordProxy` objects with cached, shared modules. This eliminated the primary object-creation bottleneck.
+    2.  **Inflector Memoization:** Implemented caching for inflection results, dramatically reducing redundant string and regex operations in hot loops.
+    * **Result:** `Dami (preload)` is now **~1.6x faster than ActiveRecord (`includes`)** in competitive benchmarks for common scenarios.
+
+### 🔧 Fixes & Hardening
+
+* **CLI Hardening:** The `dami` command-line interface is now more robust and provides user-friendly error messages for common misconfigurations, such as:
+    * Missing `config/initializers/dami.rb` file.
+    * Database not connected when running `db:*` tasks.
+    * Missing `db/schema.rb` file when generating migrations.
+
+* **Test Suite Reliability:** Fixed flaky tests by implementing a central reset mechanism (`Dami.clear_all!`). This ensures that all global state (model definitions, plugin caches) is cleared before every test, guaranteeing 100% test isolation and reliability.
+
+* **Bug Fixes:**
+    * Corrected the `perform` helper in the Flow DSL (was mistakenly documented as `call`).
+    * Fixed a bug in the associations plugin where polymorphic and `has_many :through` definitions were not being parsed correctly, leading to `NoMethodError`s in certain load orders.
+
+## [0.9.0] - 2025-10-07
+
+### ✨ Added
+
+* **Flows for Orchestration**: Introduced `Dami.run` and `Dami.flow`, the "Tier 3" system for orchestrating complex, multi-step business processes. This provides a clean, readable, and imperative DSL for defining application workflows.
+* **Automatic Transactional Guarantee**: `Dami.run` automatically wraps the entire flow in a database transaction, ensuring all database operations are atomic. If any step raises an exception, the entire transaction is rolled back.
+* **Safe Side Effects (`succeed with:`)**: Flows now have a `succeed with: ..., and_then: [...]` method. This provides a transaction-aware "holding area" for irreversible actions (like enqueuing jobs), guaranteeing they only execute *after* the database transaction has successfully committed.
+* **Flow DSL**: The block inside a `Dami.flow` now has a rich set of helpers for building robust workflows:
+    * `prepare`: Runs a `Dami::Command` to validate and transform data, halting automatically on failure.
+    * `perform`: Executes an arbitrary block of code (e.g., an external API call) with resilience options.
+    * `db`: Provides access to the query builder.
+    * `run`: Calls other Dami flows as sub-routines.
+* **Error Handling (`rescue_from`)**: Flows can now define custom handlers for specific exceptions, allowing for graceful error recovery.
+
+## [0.8.0] - 2025-10-01
+
+### ✨ Added
+
+* **Commands (`Dami::Command`)**: Introduced `Dami::Command`, a powerful class for encapsulating complex, reusable business logic. Commands provide a formal structure for contextual validation, data transformation, and dependency injection.
+* **Declarative Command DSL**: `Dami::Command` includes a rich DSL for building business rules:
+    * `requires_context`: For declaring dependencies.
+    * `validate`: For defining validation rules with `if:` and `unless:` conditionals.
+    * `transform`: For defining data transformation steps.
+    * `apply` & `compose`: For building complex commands from smaller, reusable components.
+
+## [0.7.0] - 2025-10-01
+
+### ✨ Added
+
+* **Inline Drafts**: The `.create` and `.update` methods now accept an optional block that yields a `draft` object. This provides a powerful, inline DSL for adding contextual validation and data transformation for simple-to-medium complexity operations. The `draft` DSL (`verify`, `transform`, `prevent_changes`) mirrors the `Command` API for a consistent developer experience.
+
+## [0.8.0] - 2025-10-01
+
+### ✨ Added
+
+* **Commands**: Introduced `Dami::Command`, the "Tier 3" tool for encapsulating complex, reusable business logic. Commands provide a formal structure for contextual validation (`validate`), data transformation (`transform`), and dependency injection (`requires_context`).
+* **Command Composition**: Commands can now be built from smaller, reusable components using `compose` and `apply`, promoting a DRY and modular architecture for business rules.
+* **Conditional Logic**: The `validate` DSL now supports powerful conditional execution with `if:` and `unless:` options.
 
 ## [0.7.0] - 2025-10-01
 

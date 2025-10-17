@@ -19,13 +19,14 @@ Minitest::Reporters.use! [
 class Minitest::Test
   # This setup method runs before EVERY single test, guaranteeing a clean slate.
   def setup
+
     # 1. Reset Dami's global state to prevent pollution between tests.
     Dami.instance_variable_set(:@databases, {})
     Dami.instance_variable_set(:@models, {})
 
     # 2. Register validation rules so models can be defined correctly.
     self.class.register_validation_rules
-
+    Dami.clear_all!
     # 3. Connect to the database. For SQLite, this creates a new file if needed.
     config = DatabaseHelper.config
     @db = Dami.connect(:default, **config)

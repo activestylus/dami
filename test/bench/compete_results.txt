@@ -1,0 +1,118 @@
+--- Profiling Dami Preload ---
+NOTE: RubyProf.profile is deprecated; use RubyProf::Profile.profile instead. It will be removed on or after 2023-06.
+RubyProf.profile called from bench/compete.rb:76.
+NOTE: RubyProf.running? is deprecated; use RubyProf::Profile#running? instead. It will be removed on or after 2023-06.
+RubyProf.running? called from /Users/stevengarcia/.gem/ruby/3.3.5/gems/ruby-prof-1.7.2/lib/ruby-prof/compatibility.rb:97.
+NOTE: RubyProf.measure_mode is deprecated; use RubyProf::Profile#measure_mode instead. It will be removed on or after 2023-06.
+RubyProf.measure_mode called from /Users/stevengarcia/.gem/ruby/3.3.5/gems/ruby-prof-1.7.2/lib/ruby-prof/compatibility.rb:80.
+NOTE: RubyProf.exclude_threads is deprecated; use RubyProf::Profile#exclude_threads instead. It will be removed on or after 2023-06.
+RubyProf.exclude_threads called from /Users/stevengarcia/.gem/ruby/3.3.5/gems/ruby-prof-1.7.2/lib/ruby-prof/compatibility.rb:80.
+Measure Mode: wall_time
+Thread ID: 1000
+Fiber ID: 980
+Total: 0.190937
+Sort by: total_time
+
+ %self      total      self      wait     child     calls  name                           location
+ 10.98      0.100     0.021     0.000     0.079      801  *Array#each                     
+  5.71      0.084     0.011     0.000     0.073     1100   Array#map                      
+  4.65      0.044     0.009     0.000     0.035    11000   SqliteQuery#convert_row        /Users/stevengarcia/Desktop/dami/lib/dami/adapters/sqlite/query.rb:284
+  4.29      0.043     0.008     0.000     0.035    21704  *Class#new                      
+  4.34      0.040     0.008     0.000     0.032    10000   Dami::Plugins::Associations::AdapterMethods#wrap_preloaded_data_for_adapter /Users/stevengarcia/Desktop/dami/lib/dami/plugins/associations.rb:145
+  1.57      0.038     0.003     0.000     0.035    11200   Enumerable#each_with_object    
+  3.60      0.035     0.007     0.000     0.028    21000   Dami::RecordProxy#initialize   /Users/stevengarcia/Desktop/dami/lib/dami/record_proxy.rb:4
+ 10.00      0.029     0.019     0.000     0.010    11202   Hash#each                      
+  2.74      0.028     0.005     0.000     0.023    21000   Dami::Plugins::Associations::RecordProxyMethods#define_relationship_accessors /Users/stevengarcia/Desktop/dami/lib/dami/plugins/associations.rb:41
+  1.10      0.020     0.002     0.000     0.018      200   SQLite3::ResultSet#each        /Users/stevengarcia/.gem/ruby/3.3.5/gems/sqlite3-2.7.2-arm64-darwin/lib/sqlite3/resultset.rb:48
+  2.93      0.018     0.006     0.000     0.012    11200   SQLite3::HashResultSet#next    /Users/stevengarcia/.gem/ruby/3.3.5/gems/sqlite3-2.7.2-arm64-darwin/lib/sqlite3/resultset.rb:85
+  2.11      0.017     0.004     0.000     0.013    21000   Kernel#extend                  
+  6.66      0.013     0.013     0.000     0.000   188502   Hash#[]                        
+  6.39      0.012     0.012     0.000     0.000    21000   Module#extend_object           
+  2.92      0.009     0.006     0.000     0.004    10100   <Module::Dami::Inflector>#pluralize /Users/stevengarcia/Desktop/dami/lib/dami/inflector.rb:146
+  1.86      0.005     0.004     0.000     0.002    21000   <Module::Dami::Plugins::Associations>#association_module_for /Users/stevengarcia/Desktop/dami/lib/dami/plugins/associations.rb:10
+  1.76      0.005     0.003     0.000     0.001    20000   Dami::RecordProxy#[]           /Users/stevengarcia/Desktop/dami/lib/dami/record_proxy.rb:11
+  1.94      0.004     0.004     0.000     0.000    42200   String#to_sym                  
+  1.79      0.003     0.003     0.000     0.000    11200   SQLite3::Statement#step        
+  1.75      0.003     0.003     0.000     0.000    43005   Hash#[]=                       
+  1.65      0.003     0.003     0.000     0.000    11000   Array#zip                      
+  1.55      0.003     0.003     0.000     0.000    11000   Array#to_h                     
+  1.54      0.003     0.003     0.000     0.000    10100   Hash#merge                     
+  1.34      0.003     0.003     0.000     0.000    32000   Hash#dig                       
+  1.08      0.002     0.002     0.000     0.000    33102   Kernel#is_a?                   
+
+* recursively called methods
+
+Columns are:
+
+  %self     - The percentage of time spent by this method relative to the total time in the entire program.
+  total     - The total time spent by this method and its children.
+  self      - The time spent by this method.
+  wait      - The time this method spent waiting for other threads.
+  child     - The time spent by this method's children.
+  calls     - The number of times this method was called.
+  name      - The name of the method.
+  location  - The location of the method.
+
+The interpretation of method names is:
+
+  * MyObject#test - An instance method "test" of the class "MyObject"
+  * <Object:MyObject>#test - The <> characters indicate a method on a singleton class.
+
+
+--- Running Full Competitive Benchmarks ---
+
+--- Competitive Benchmarks (SQLite) ---
+
+Record Creation (Single):
+
+Finding by ID:
+
+Simple Where (Indexed user_id):
+
+Association Loading (100 Posts + User):
+ruby 3.3.5 (2024-09-03 revision ef084cc8f4) [arm64-darwin23]
+Warming up --------------------------------------
+                Dami     3.099k i/100ms
+        ActiveRecord   839.000 i/100ms
+              Sequel     2.561k i/100ms
+                Dami    15.255k i/100ms
+        ActiveRecord     3.018k i/100ms
+              Sequel    12.024k i/100ms
+                Dami     1.021k i/100ms
+        ActiveRecord   679.000 i/100ms
+              Sequel     1.037k i/100ms
+          Dami (N+1)    72.000 i/100ms
+      Dami (preload)   220.000 i/100ms
+  ActiveRecord (N+1)    10.000 i/100ms
+ActiveRecord (includes)
+                       139.000 i/100ms
+        Sequel (N+1)    86.000 i/100ms
+      Sequel (eager)   519.000 i/100ms
+Calculating -------------------------------------
+                Dami     31.231k (± 1.5%) i/s   (32.02 μs/i) -    158.049k in   5.061799s
+        ActiveRecord      8.289k (± 1.9%) i/s  (120.64 μs/i) -     41.950k in   5.062786s
+              Sequel     25.346k (± 0.7%) i/s   (39.45 μs/i) -    128.050k in   5.052381s
+                Dami    151.508k (± 0.6%) i/s    (6.60 μs/i) -    762.750k in   5.034549s
+        ActiveRecord     28.660k (± 3.3%) i/s   (34.89 μs/i) -    144.864k in   5.059702s
+              Sequel    121.482k (± 2.6%) i/s    (8.23 μs/i) -    613.224k in   5.051342s
+                Dami     10.230k (± 1.1%) i/s   (97.75 μs/i) -     52.071k in   5.090603s
+        ActiveRecord      6.801k (± 1.2%) i/s  (147.04 μs/i) -     34.629k in   5.092616s
+              Sequel     10.480k (± 0.3%) i/s   (95.42 μs/i) -     52.887k in   5.046565s
+          Dami (N+1)    913.026 (± 1.8%) i/s    (1.10 ms/i) -      4.608k in   5.048649s
+      Dami (preload)      2.192k (± 1.0%) i/s  (456.12 μs/i) -     11.000k in   5.017892s
+  ActiveRecord (N+1)    102.401 (± 2.0%) i/s    (9.77 ms/i) -    520.000 in   5.080442s
+ActiveRecord (includes)
+                          1.369k (± 0.8%) i/s  (730.23 μs/i) -      6.950k in   5.075388s
+        Sequel (N+1)    866.296 (± 0.2%) i/s    (1.15 ms/i) -      4.386k in   5.062966s
+      Sequel (eager)      5.214k (± 0.3%) i/s  (191.77 μs/i) -     26.469k in   5.076101s
+
+Comparison:
+              Sequel:    10479.9 i/s
+                Dami:    10230.2 i/s - 1.02x  slower
+        ActiveRecord:     6800.9 i/s - 1.54x  slower
+      Sequel (eager):     5214.5 i/s - 2.01x  slower
+      Dami (preload):     2192.4 i/s - 4.78x  slower
+ActiveRecord (includes):     1369.4 i/s - 7.65x  slower
+          Dami (N+1):      913.0 i/s - 11.48x  slower
+        Sequel (N+1):      866.3 i/s - 12.10x  slower
+  ActiveRecord (N+1):      102.4 i/s - 102.34x  slower

@@ -23,8 +23,16 @@ module Dami
   end
   class ModelConfig
     def initialize(name)
-      @config = { name: name, database: :default, fields: {}, virtual_fields: {}, protection: {}, relationships: {}, validations: {}, scopes: {} }
+      @config = { name: name, database: :default, fields: {}, virtual_fields: {}, protection: {}, relationships: {}, validations: {}, scopes: {}, nests: {} }
     end
+
+    def nests(*names, **options)
+      proxy = NestsProxy.new(@config[:nests])
+      names.each do |name|
+        proxy.nest(name, **options)
+      end
+    end
+
     def scopes(&block)
       ScopesProxy.new(@config[:scopes]).instance_eval(&block)
     end
@@ -129,6 +137,7 @@ module Dami
         end
       end
     end
+
     def rule(*args, **kwargs)
       when_cond = kwargs.delete(:when)
       unless_cond = kwargs.delete(:unless)
@@ -160,6 +169,19 @@ module Dami
     end
     def scope(name, body)
       @target[name] = body
+    end
+  end
+  class Dami::NestsProxy
+    def initialize(target)
+      @target = target
+    end
+
+    def nest(association_name, **options)
+      attributes_key = "#{association_name}_attributes".to_sym
+      @target[attributes_key] = {
+        association_name: association_name,
+        allow_destroy: options.fetch(:allow_destroy, false) # Defaults to false for security
+      }.freeze
     end
   end
 end

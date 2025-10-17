@@ -6,7 +6,8 @@ module Dami
         def filter_input!(model_name, attrs, permit: [], protect: true)
           model_config = find_model(model_name)
           virtual_fields = (model_config[:virtual_fields] || {}).keys
-          known_fields = (model_config[:fields] || {}).keys + virtual_fields + [:id]
+          nested_attr_keys = (model_config[:nests] || {}).keys
+          known_fields = (model_config[:fields] || {}).keys + virtual_fields + nested_attr_keys + [:id]
           unknown = attrs.keys - known_fields
           raise UnknownFieldsError.new("Unknown fields: #{unknown.join(', ')}", unknown) unless unknown.empty?
           if protect
