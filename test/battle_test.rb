@@ -104,26 +104,17 @@ end
 class ConstraintBattleTest < Minitest::Test
   def setup
     super
-    # Create a table with a database-level UNIQUE constraint
     @db.execute("CREATE TABLE products (id INTEGER PRIMARY KEY, sku TEXT UNIQUE NOT NULL);")
-    Dami.model(:products) { fields { field :sku, :string } }
-  end
-
-  def test_creating_duplicate_raises_specific_exception
-    @db[:products].create(sku: 'ABC-123')
-    
-    # NOTE: This test is designed to FAIL initially.
-    # It will raise a generic `SQLite3::ConstraintException`. The goal is to modify
-    # the adapter's `insert_record` method to rescue this low-level error
-    # and re-raise the more user-friendly `Dami::UniqueConstraintViolation`.
-    
-    # assert_raises(Dami::UniqueConstraintViolation) do
-    #   @db[:products].create(sku: 'ABC-123')
-    # end
-
-    # For now, we test the current behavior.
-    assert_raises(SQLite3::ConstraintException) do
-      @db[:products].create(sku: 'ABC-123')
+    Dami.model :products do
+      fields { field :sku, :string }
     end
+  end
+  def test_creating_duplicate_raises_specific_exception
+    @db[:products].create(sku: 'ABC123')
+    error = assert_raises(Dami::UniqueConstraintViolation) do
+      @db[:products].create(sku: 'ABC123')
+    end
+    assert_includes error.message, "UNIQUE constraint failed"
+    assert_equal :sku, error.column
   end
 end

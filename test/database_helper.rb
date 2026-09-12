@@ -37,7 +37,7 @@ module DatabaseHelper
   def self.define_schema(db)
     pk = pk_type
     dt = datetime_type
-    db.execute("CREATE TABLE users (id #{pk}, name TEXT, email TEXT, bio TEXT, password_hash TEXT, account_type TEXT, ssn TEXT, role TEXT, status TEXT, age INTEGER, created_at #{dt});")
+    db.execute("CREATE TABLE users (id #{pk}, first_name TEXT, last_name TEXT, email TEXT, bio TEXT, password_hash TEXT, account_type TEXT, ssn TEXT, role TEXT, status TEXT, age INTEGER, created_at #{dt});")
     db.execute("CREATE TABLE profiles (id #{pk}, user_id INTEGER, bio TEXT);")
     db.execute("CREATE TABLE posts (id #{pk}, user_id INTEGER, title TEXT, published_at #{dt}, status TEXT, content TEXT, published BOOLEAN);")
     db.execute("CREATE TABLE tags (id #{pk}, name TEXT);")
@@ -53,7 +53,12 @@ module DatabaseHelper
     case adapter_name
     when :sqlite
       tables = db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
-      tables.each { |row| db.execute("DROP TABLE IF EXISTS #{row['name']}") }
+      # Foreign keys are enforced, so drop everything in one transaction with
+      # deferred checks: by commit time no table (and no violation) is left.
+      db.transaction do
+        db.execute("PRAGMA defer_foreign_keys = ON")
+        tables.each { |row| db.execute("DROP TABLE IF EXISTS #{row['name']}") }
+      end
     when :postgres
       db.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
     when :mysql

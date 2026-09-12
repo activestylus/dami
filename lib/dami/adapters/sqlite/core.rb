@@ -5,7 +5,6 @@ require_relative '../base'
 require_relative 'connection'
 require_relative 'query'
 require_relative 'schema'
-#require_relative 'associations'
 module Dami
   module Adapters
     class Sqlite < Base
@@ -13,7 +12,6 @@ module Dami
       include SqliteQuery
       include SqliteSchema
       include Dami::Plugins::Associations::AdapterMethods
-      #include SqliteAssociations
     end
   end
 end

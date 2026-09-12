@@ -15,6 +15,7 @@ module Dami
     
     def rollback(steps = 1)
       completed_migrations.reverse.first(steps).each { |m| reverse_migration(m) }
+      dump_schema
     end
     
     private

@@ -21,15 +21,18 @@ module Dami
         @joins = joins
       end
 
-      def where(conds = nil, &block)
-        if block
-          sub_query = self.class.new(@model_name)
-          block.call(sub_query)
-          clone_with(conditions: @conditions + [[:and, sub_query.instance_variable_get(:@conditions)]])
-        else
-          clone_with(conditions: @conditions + [[:and, conds]])
-        end
+def where(*args, &block)
+      if block
+        sub_query = self.class.new(@model_name)
+        block.call(sub_query)
+        clone_with(conditions: @conditions + [[:and, sub_query.instance_variable_get(:@conditions)]])
+      else
+        # If multiple arguments are passed (e.g., from a raw SQL scope),
+        # keep them as an array. Otherwise, it's a hash.
+        conds = args.length > 1 ? args : args.first
+        clone_with(conditions: @conditions + [[:and, conds]])
       end
+    end
 
       def or(conds = nil, &block)
         if block

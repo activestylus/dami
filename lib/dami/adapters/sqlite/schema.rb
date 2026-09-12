@@ -19,11 +19,6 @@ def table_exists?(table_name)
   !execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", [table_name.to_s]).empty?
 end
 
-def column_exists?(table_name, column_name)
-  return false unless table_exists?(table_name)
-  columns = execute("PRAGMA table_info(#{table_name})")
-  columns.any? { |col| col['name'] == column_name.to_s }
-end
   def execute_schema_operations(ops)
     ops.each do |op|
       case op[:type]
@@ -45,18 +40,19 @@ end
   end
 
   def column_exists?(table, column)
+    return false unless table_exists?(table)
     columns(table).any? { |col| col[:name] == column.to_s }
   end
-  def columns(table)
-    execute("PRAGMA table_info(#{table})").map { |row| { name: row['name'], type: sqlite_to_ruby_type(row['type']) } }
-  end
+  # options: unique: true
   def add_index(table, column, options = {})
-    index_name = "index_#{table}_on_#{column}"
-    execute("CREATE INDEX #{index_name} ON #{table} (#{column})")
+    columns = Array(column)
+    index_name = "index_#{table}_on_#{columns.join('_and_')}"
+    unique = options[:unique] ? 'UNIQUE ' : ''
+    execute("CREATE #{unique}INDEX #{index_name} ON #{table} (#{columns.join(', ')})")
   end
 
   def remove_index(table, column, options = {})
-    index_name = "index_#{table}_on_#{column}"
+    index_name = "index_#{table}_on_#{Array(column).join('_and_')}"
     execute("DROP INDEX IF EXISTS #{index_name}")
   end
   def tables
@@ -84,23 +80,40 @@ end
       end
       .compact
   end
+  # Column options understood here (all optional):
+  #   null: false            -> NOT NULL
+  #   default: value         -> DEFAULT <literal>  (:current_timestamp for CURRENT_TIMESTAMP)
+  #   unique: true           -> UNIQUE
+  #   references: :table     -> REFERENCES table(id)  (add `on_delete: :cascade` if wanted)
   def column_definition(col)
     parts = ["#{col[:name]} #{map_type(col[:type])}"]
     parts << "PRIMARY KEY AUTOINCREMENT" if col[:type] == :primary_key
+    parts << "NOT NULL" if col[:null] == false
+    parts << "UNIQUE" if col[:unique]
+    parts << "DEFAULT #{sql_literal(col[:default])}" if col.key?(:default)
+    if col[:references]
+      parts << "REFERENCES #{col[:references]}(#{col[:references_column] || 'id'})"
+      parts << "ON DELETE #{col[:on_delete].to_s.upcase.tr('_', ' ')}" if col[:on_delete]
+    end
     parts.join(' ')
   end
+  # One type map for create_table AND add_column (Migration delegates here).
   def map_type(type)
     case type.to_sym
     when :primary_key, :integer, :boolean then 'INTEGER'
+    when :float, :decimal then 'REAL'
+    when :datetime, :date, :time then 'DATETIME'
     when :string, :text, :json then 'TEXT'
     else 'TEXT'
     end
   end
-  def sqlite_to_ruby_type(type)
-    case type.upcase
-    when 'INTEGER' then :integer
-    when 'TEXT' then :string
-    else :string
+  def sql_literal(value)
+    case value
+    when nil then 'NULL'
+    when :current_timestamp then 'CURRENT_TIMESTAMP'
+    when Numeric then value.to_s
+    when TrueClass, FalseClass then value ? '1' : '0'
+    else "'#{value.to_s.gsub("'", "''")}'"
     end
   end
 

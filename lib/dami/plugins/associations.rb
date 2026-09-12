@@ -1,33 +1,27 @@
+# File: lib/dami/plugins/associations.rb
+
 # frozen_string_literal: true
 module Dami
   module Plugins
     module Associations
-      # Central cache for the dynamically generated association modules (Flyweights).
       @association_modules = {}
 
-      # Clears the module cache. Used primarily for testing to ensure a clean state.
       def self.clear_cache!
         @association_modules.clear
       end
 
-      # Defines class-level methods that will be extended onto the main Dami module.
-      # This provides the central mechanism for creating and caching the association modules.
+      # Defines class-level DSL methods (e.g., .association_module_for)
       module ClassMethods
-        # Direct accessor for the plugin's module cache.
         def association_module_cache
           Associations.instance_variable_get(:@association_modules)
         end
 
-        # Retrieves a cached association module for a given model name.
-        # If the module doesn't exist, it creates it once and caches it.
         def association_module_for(model_name)
           association_module_cache[model_name] ||= create_association_module(model_name)
         end
 
         private
 
-        # Creates a new shared module for a specific model type. This module
-        # contains all the association accessor methods (e.g., #user, #posts).
         def create_association_module(model_name)
           mod = Module.new
           model_config = Dami.find_model(model_name) rescue nil
@@ -35,13 +29,8 @@ module Dami
 
           rels.each do |_type, rel_config|
             rel_config.each do |name, _options|
-              # Handle different ways associations can be defined (e.g., polymorphic).
               actual_name = name.is_a?(Hash) ? name.keys.first : name
-              
-              # Define the accessor method within the shared module.
               mod.define_method(actual_name) do
-                # This block runs in the context of a RecordProxy instance.
-                # It first checks for a preloaded value, otherwise it lazy-loads.
                 @preloaded[actual_name] ||= fetch_association(actual_name)
               end
             end
@@ -50,20 +39,10 @@ module Dami
         end
       end
 
-      # Contains instance-level methods for RecordProxy objects, primarily the
-      # logic for lazy-loading associations when they are not preloaded.
-      module RecordProxyMethods
-        # This initialize is included but ultimately superseded by the prepended version
-        # in self.apply. It's kept to match the provided source structure.
-        def initialize(model_name, record, preloaded = {})
-          super
-          extend Dami.association_module_for(@model_name)
-        end
-
+      # This module now ONLY contains the lazy-loading helper methods.
+      # The conflicting `initialize` method has been removed.
+      module LazyLoadingMethods
         private
-
-        # Fetches a single association on-demand (lazy-loading). This is the
-        # fallback when an association was not eager-loaded via .preload.
         def fetch_association(assoc_name)
           model_config = Dami.find_model(@model_name)
           type, config = find_association_config(model_config, assoc_name)
@@ -77,13 +56,13 @@ module Dami
             model_name = config[:model] || Dami::Inflector.pluralize(assoc_name.to_s).to_sym
             ::Dami.db(model_name).find(id)
           when :has_many
-            _fk, model_name = association_keys(type, assoc_name, config)
-            query = ::Dami.db(model_name).where(association_keys(type, assoc_name, config)[0] => @record[:id])
+            _fk, model_name = association_keys(assoc_name, config)
+            query = ::Dami.db(model_name).where(association_keys(assoc_name, config)[0] => @record[:id])
             query = query.where("#{config[:as]}_type".to_sym => Dami::Inflector.singularize(@model_name.to_s).capitalize) if config[:as]
             query
           when :has_one
-            _fk, model_name = association_keys(type, assoc_name, config)
-            query = ::Dami.db(model_name).where(association_keys(type, assoc_name, config)[0] => @record[:id])
+            _fk, model_name = association_keys(assoc_name, config)
+            query = ::Dami.db(model_name).where(association_keys(assoc_name, config)[0] => @record[:id])
             query = query.where("#{config[:as]}_type".to_sym => Dami::Inflector.singularize(@model_name.to_s).capitalize) if config[:as]
             query.first
           end
@@ -98,8 +77,7 @@ module Dami
         end
 
         def fetch_has_many_through(config)
-          through_assoc_name = config[:through]
-          through_rel = public_send(through_assoc_name)
+          through_rel = public_send(config[:through])
           through_records = case through_rel
                             when Dami::Query::Builder then through_rel.to_a
                             when Dami::RecordProxy then [through_rel]
@@ -107,8 +85,8 @@ module Dami
                             end
           target_model_name = config[:model] || Dami::Inflector.pluralize(config[:name].to_s).to_sym
           return ::Dami.db(target_model_name).where(id: []) if through_records.empty?
-          target_fk_on_intermediate = "#{config[:name].to_s.singularize}_id".to_sym
-          target_ids = through_records.map { |r| r[target_fk_on_intermediate] }.compact.uniq
+          target_fk = "#{Dami::Inflector.singularize(config[:name].to_s)}_id".to_sym
+          target_ids = through_records.map { |r| r[target_fk] }.compact.uniq
           ::Dami.db(target_model_name).where(id: target_ids)
         end
 
@@ -126,7 +104,7 @@ module Dami
           raise "Association :#{assoc_name} not found on #{@model_name}"
         end
 
-        def association_keys(type, name, config)
+        def association_keys(name, config)
           owner_singular = Dami::Inflector.singularize(@model_name.to_s)
           fk = config[:foreign_key] || (config[:as] ? "#{config[:as]}_id".to_sym : "#{owner_singular}_id".to_sym)
           model_name = config[:model] || Dami::Inflector.pluralize(name.to_s).to_sym
@@ -134,8 +112,7 @@ module Dami
         end
       end
 
-      # Contains the logic for eager-loading associations, which is mixed into the adapter.
-      # This code was already correct and remains unchanged.
+      # Contains the preloading logic that gets included into the database adapter.
       module AdapterMethods
         def preload_associations(proxies, relations)
           return proxies if proxies.empty?
@@ -200,7 +177,7 @@ module Dami
              end
            end
            raise "Association :#{assoc_name} not found on #{model_config[:name]}"
-         end
+        end
 
         def preload_belongs_to(records, config)
           fk = config[:foreign_key] || "#{config[:name]}_id".to_sym
@@ -275,19 +252,28 @@ module Dami
         end
       end
 
-      # This is the entry point for the plugin. It wires all the pieces together.
+      # This is the single entry point for the plugin, orchestrating all enhancements.
       def self.apply(dami_module)
         dami_module.extend(ClassMethods)
+        dami_module::RecordProxy.include(LazyLoadingMethods)
         
-        # Provides the lazy-loading helpers (e.g., fetch_association) to RecordProxy instances.
-        dami_module::RecordProxy.include(RecordProxyMethods)
-        
-        # This is the core of the optimization. It modifies the initialize process
-        # for every RecordProxy to efficiently apply the shared association methods.
+        # --- THE ONE AND ONLY INITIALIZE WRAPPER ---
         dami_module::RecordProxy.prepend(Module.new do
           def initialize(*args)
-            super
+            # 1. Run the original, clean Dami::RecordProxy#initialize
+            super(*args)
+
+            # 2. Apply the PRESENTER module first. This gives its methods
+            #    (like a custom `def status`) the highest priority.
+            presenter_module = Dami.find_presenter_module(@model_name)
+            extend(presenter_module) if presenter_module
+
+            # 3. Apply the ASSOCIATION methods next.
             extend Dami.association_module_for(@model_name)
+
+            # 4. Finally, define FALLBACK accessors for any schema fields
+            #    that don't already have a method from the presenter or associations.
+            _define_fallback_accessors!
           end
         end)
         

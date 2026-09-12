@@ -1,0 +1,14 @@
+.DS_Store
+*.gem
+/pkg/
+/tmp/
+
+# SQLite files created by the test suite and benchmarks
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.sqlite3-journal
+*.db
+*.db-wal
+*.db-shm
+*.db-journal

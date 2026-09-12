@@ -66,9 +66,11 @@ module Dami
         end
       end
     end
-    def run_transformations
+def run_transformations
       current_data = @data.dup
       (self.class.instance_variable_get(:@transformations) || []).each do |t|
+        # THE FIX: Each transform block returns a hash of changes.
+        # We must MERGE these changes into the current data hash.
         result = instance_exec(current_data, &t[:block])
         current_data.merge!(result) if result.is_a?(Hash)
       end

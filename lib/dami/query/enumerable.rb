@@ -1,4 +1,3 @@
-# frozen_string_literal: true
 module Dami
   module Query
     module Enumerable
@@ -9,16 +8,15 @@ module Dami
       def to_a
         query_structure = build_query_structure
         records = adapter.query_records(query_structure)
-        proxies = records.map { |r| ::Dami::RecordProxy.new(@model_name, r) }
+        proxies = records.map { |r| Dami.wrap_record(@model_name, r) }
         @preload.empty? ? proxies : adapter.preload_associations(proxies, @preload)
       end
       alias_method :all, :to_a
 
       def find(id)
         record = adapter.find_record(@model_name, id)
-        record ? ::Dami::RecordProxy.new(@model_name, record) : nil
+        Dami.wrap_record(@model_name, record)
       end
-
       def find_each(batch_size: 1000, &block)
         find_in_batches(batch_size: batch_size) do |batch|
           batch.each(&block)

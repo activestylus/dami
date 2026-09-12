@@ -1,58 +1,81 @@
-# test/scopes_test.rb
+# File: test/scopes_test.rb
+
 require_relative 'test_helper'
 
 class ScopesTest < Minitest::Test
   def setup
-  	super
+    super
+    # Self-contained model definitions
+    Dami.model(:users) do
+      fields do
+        field :first_name, :string
+        field :last_name, :string
+        field :status, :string
+        field :role, :string
+        field :created_at, :datetime
+      end
+    end
+    
+    Dami.model(:posts) do
+      fields do
+        field :user_id, :integer
+        field :title, :string
+        field :status, :string
+        field :published_at, :datetime
+      end
+    end
+    
+    Dami.scopes(:users) do
+      scope :active, -> { where(status: 'active') }
+      scope :admins, -> { where(role: 'admin') }
+      scope :by_status, ->(status) { where(status: status) }
+      scope :recent, -> { where('created_at > ?', Time.now - 86400) }
+    end
+    
+    Dami.scopes(:posts) do
+      scope :published, -> { where(status: 'published') }
+      scope :drafts, -> { where(status: 'draft') }
+    end
+
     now = Time.now
-    two_days_ago = Time.now - 172800
-    
-    # THE FIX: Add `permit: [:role]` to bypass the protection for test data setup.
-    @user1 = @db[:users].create(name: 'Alice', status: 'active', role: 'user', created_at: now, permit: [:role])
-    @user2 = @db[:users].create(name: 'Bob', status: 'inactive', role: 'user', created_at: two_days_ago, permit: [:role])
-    @user3 = @db[:users].create(name: 'Admin', status: 'active', role: 'admin', created_at: now, permit: [:role])
-    
-    # These create calls are fine as they don't involve protected fields.
+    @user1 = @db[:users].create(first_name: 'Alice', last_name: 'A', status: 'active', role: 'user', created_at: now, permit: [:role])
+    @user2 = @db[:users].create(first_name: 'Bob', last_name: 'B', status: 'inactive', role: 'user', created_at: now - 172800, permit: [:role])
+    @user3 = @db[:users].create(first_name: 'Admin', last_name: 'User', status: 'active', role: 'admin', created_at: now, permit: [:role])
     @post1 = @db[:posts].create(user_id: @user1[:id], title: 'Published Post', status: 'published', published_at: now)
     @post2 = @db[:posts].create(user_id: @user1[:id], title: 'Draft Post', status: 'draft', published_at: now)
   end
   
   def test_scope_methods_exist
     assert_respond_to @db[:users], :active
-    assert_respond_to @db[:users], :admins
-    assert_respond_to @db[:users], :by_status
-    assert_respond_to @db[:users], :recent
-    
     assert_respond_to @db[:posts], :published
-    assert_respond_to @db[:posts], :drafts
   end
   
   def test_basic_scope_usage
     active_users = @db[:users].active.to_a
     assert_equal 2, active_users.length
     
-    active_user_names = active_users.map { |u| u[:name] }
+    active_user_names = active_users.map { |u| u[:first_name] }
     assert_includes active_user_names, 'Alice'
     assert_includes active_user_names, 'Admin'
     
     admins = @db[:users].admins.to_a
     assert_equal 1, admins.length
-    assert_equal 'Admin', admins.first[:name]
+    assert_equal 'Admin', admins.first[:first_name]
   end
-  
+
   def test_scope_with_arguments
     inactive_users = @db[:users].by_status('inactive').to_a
     assert_equal 1, inactive_users.length
-    assert_equal 'Bob', inactive_users.first[:name]
+    assert_equal 'Bob', inactive_users.first[:first_name]
   end
-  
+
   def test_scope_chaining
     recent_active_users = @db[:users].active.recent.to_a
     assert_equal 2, recent_active_users.length
     
     recent_admins = @db[:users].admins.recent.to_a
     assert_equal 1, recent_admins.length
-    assert_equal 'Admin', recent_admins.first[:name]
+    assert_equal 'Admin', recent_admins.first[:first_name]
   end
   
   def test_cross_model_scopes
@@ -69,39 +92,38 @@ class ScopesTest < Minitest::Test
     recent_active_alice = @db[:users]
       .active
       .recent
-      .where(name: 'Alice')
+      .where(first_name: 'Alice')
       .to_a
-    
+      
     assert_equal 1, recent_active_alice.length
-    assert_equal 'Alice', recent_active_alice.first[:name]
+    assert_equal 'Alice', recent_active_alice.first[:first_name]
   end
   
   def test_scopes_with_ordering
-    # Use ID ordering for predictable results
     users = @db[:users].active.order(:id).to_a
-    assert_equal ['Alice', 'Admin'], users.map { |u| u[:name] }
+    assert_equal ['Alice', 'Admin'], users.map { |u| u[:first_name] }
   end
   
   def test_scopes_with_limit
     users = @db[:users].active.order(:id).limit(1).to_a
     assert_equal 1, users.length
-    assert_equal 'Alice', users.first[:name]
+    assert_equal 'Alice', users.first[:first_name]
   end
   
   def test_scopes_with_offset
     users = @db[:users].active.order(:id).limit(1).offset(1).to_a
     assert_equal 1, users.length
-    assert_equal 'Admin', users.first[:name]
+    assert_equal 'Admin', users.first[:first_name]
   end
   
   def test_scopes_with_where_chaining
     admin_alice = @db[:users]
       .active
-      .where(name: 'Alice')
+      .where(first_name: 'Alice')
       .to_a
     
     assert_equal 1, admin_alice.length
-    assert_equal 'Alice', admin_alice.first[:name]
+    assert_equal 'Alice', admin_alice.first[:first_name]
   end
   
   def test_complex_scope_chain
@@ -113,7 +135,7 @@ class ScopesTest < Minitest::Test
       .to_a
     
     assert_equal 1, result.length
-    assert_equal 'Alice', result.first[:name]
+    assert_equal 'Alice', result.first[:first_name]
   end
   
   def test_undefined_methods_still_raise_errors

@@ -12,20 +12,37 @@ Gem::Specification.new do |spec|
   spec.description = "Dami is a modern, minimal ORM focusing on a clean query DSL, explicit data validation, and secure attribute protection."
   spec.homepage    = "https://github.com/activestylus/dami"
   spec.license     = "MIT"
+  spec.required_ruby_version = ">= 3.0"
 
-  spec.files = Dir.chdir(File.expand_path(__dir__)) do
-    `git ls-files -z`.split("\x0").reject { |f| f.match(%r{\A(?:test|spec|features)/}) }
-  end
+  spec.metadata = {
+    "source_code_uri"       => spec.homepage,
+    "changelog_uri"         => "#{spec.homepage}/blob/main/CHANGELOG.md",
+    "documentation_uri"     => "#{spec.homepage}/tree/main/docs",
+    "rubygems_mfa_required" => "true",
+  }
+
+  # Explicit file list from disk (not `git ls-files`), so the gem never depends
+  # on what happens to be committed.
+  spec.files = Dir[
+    "lib/**/*.rb",
+    "bin/*",
+    "docs/*.md",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+  ]
 
   spec.bindir        = "bin"
   spec.executables   = ["dami"]
   spec.require_paths = ["lib"]
 
   spec.add_dependency "thor", "~> 1.2"
-  spec.add_dependency "connection_pool", "~> 2.4"
-  spec.add_dependency "sqlite3", "~> 1.6"
+  spec.add_dependency "connection_pool", ">= 2.4", "< 4"
+  spec.add_dependency "sqlite3", "~> 2.0"
+
+  spec.add_development_dependency "minitest", "~> 5.16"
+  spec.add_development_dependency "minitest-reporters", "~> 1.6"
+  spec.add_development_dependency "rake", "~> 13.0"
   spec.add_development_dependency "benchmark-ips", "~> 2.8"
-  spec.add_development_dependency "activerecord", "~> 7.0"
-  spec.add_development_dependency "sequel", "~> 5.7" 
   spec.add_development_dependency "ruby-prof", "~> 1.6"
 end

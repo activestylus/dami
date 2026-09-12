@@ -33,7 +33,7 @@ end
     end
     
     def add_column(table, column, type, **options)
-      @adapter.execute("ALTER TABLE #{table} ADD COLUMN #{column} #{map_type(type)}")
+      @adapter.add_column(table, column, type, **options)
     end
     
     def remove_column(table, column)
@@ -55,17 +55,6 @@ end
     end
 
     
-    private
-    
-    def map_type(type)
-      case type.to_sym
-      when :string, :text then 'TEXT'
-      when :integer, :boolean then 'INTEGER'
-      when :float, :decimal then 'REAL'
-      when :datetime, :date, :time then 'DATETIME'
-      else 'TEXT'
-      end
-    end
   end
   
   class TableDefinition
@@ -79,9 +68,17 @@ end
       @columns << { name: name, type: type, **options }
     end
     
+    # created_at / updated_at columns. Dami fills them automatically on
+    # create/update when the model declares the same two fields.
     def timestamps
       field(:created_at, :datetime)
       field(:updated_at, :datetime)
+    end
+
+    # Shorthand for a foreign-key column: t.references :user -> user_id INTEGER REFERENCES users(id)
+    def references(name, **options)
+      table = options.delete(:table) || Dami::Inflector.pluralize(name.to_s)
+      field(:"#{name}_id", :integer, references: table, **options)
     end
   end
 end

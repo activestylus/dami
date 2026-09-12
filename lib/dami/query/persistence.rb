@@ -44,10 +44,57 @@ module Dami
         end
         find(original_record[:id])
       end
-      def create_many(records)
-        return if records.empty?
-        adapter.insert_many(@model_name, records)
+# File: lib/dami/query/persistence.rb
+
+def create_many(records, permit: [], protect: true)
+  raise ArgumentError, "create_many requires an array of hashes" unless records.is_a?(Array)
+  return [] if records.empty?
+  
+  # Phase 1: Validate and prepare ALL records first
+  prepared_records = []
+  all_errors = {}
+  
+  records.each_with_index do |attrs, index|
+    begin
+      attributes = attrs.merge(permit: permit, protect: protect)
+      prepared = _prepare_persistence(attributes, :create)
+      
+      if prepared[:nested_attributes].any?
+        raise ArgumentError, "create_many does not support nested attributes. Use create() for complex records."
       end
+      
+      if prepared[:db_parent_attrs].empty?
+        raise ArgumentError, "Record #{index} has no valid attributes after filtering"
+      end
+      
+      prepared_records << prepared[:db_parent_attrs]
+    rescue Dami::ValidationError => e
+      # FIX: Just store the error object, not try to set errors
+      all_errors[index] = e.errors
+    rescue Dami::ProtectionError, Dami::UnknownFieldsError => e
+      raise e
+    end
+  end
+  
+  # If ANY validations failed, raise with collected errors
+  unless all_errors.empty?
+    # FIX: Create a custom message and pass errors in the initializer
+    message = "Validation failed for #{all_errors.size} record(s): " + 
+              all_errors.map { |idx, errs| "Record #{idx}: #{errs}" }.join("; ")
+    raise Dami::ValidationError.new(message, all_errors)
+  end
+  
+  # Phase 2: Bulk insert in transaction
+  result_ids = adapter.transaction do
+    adapter.insert_many(@model_name, prepared_records)
+  end
+  
+  # Phase 3: Return wrapped records
+  result_ids.map.with_index do |id, index|
+    record_hash = prepared_records[index].merge(id: id)
+    ::Dami::RecordProxy.new(@model_name, record_hash)
+  end
+end
       def delete
         adapter.delete_records(build_query_structure)
       end

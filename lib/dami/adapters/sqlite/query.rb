@@ -36,29 +36,35 @@ module SqliteQuery
   end
 
   def insert_record(model_name, data)
-    prepared_data = prepare_data(data, model_name)
+    prepared_data = prepare_data(stamp_timestamps(data, model_name, :create), model_name)
     columns = prepared_data.keys.join(', ')
     placeholders = (['?'] * prepared_data.keys.size).join(', ')
     sql = "INSERT INTO #{model_name} (#{columns}) VALUES (#{placeholders})"
-    execute_prepared(sql, prepared_data.values)
-    
-    last_id = last_insert_row_id
-    find_record(model_name, last_id)
+    transaction do
+      execute_prepared(sql, prepared_data.values)
+      find_record(model_name, last_insert_row_id)
+    end
   end
-  
-  def insert_many(model_name, records)
-    return if records.empty?
-    keys = records.first.keys
-    columns = keys.join(', ')
-    value_placeholder = "(#{(['?'] * keys.size).join(',')})"
-    all_placeholders = ([value_placeholder] * records.size).join(', ')
-    sql = "INSERT INTO #{model_name} (#{columns}) VALUES #{all_placeholders}"
-    params = records.flat_map { |rec| keys.map { |key| rec[key.to_sym] } }
-    execute_prepared(sql, params)
+  def insert_many(table, records)
+    return [] if records.empty?
+    records = records.map { |r| prepare_data(stamp_timestamps(r, table, :create), table) }
+    columns = records.first.keys
+    columns.each { |c| validate_identifier(c) }
+    placeholders = "(#{columns.map { '?' }.join(', ')})"
+    sql = "INSERT INTO #{table} (#{columns.join(', ')}) VALUES #{records.map { placeholders }.join(', ')}"
+    values = records.flat_map { |record| columns.map { |col| record[col] } }
+    # Both statements must run on the same connection, or last_insert_row_id
+    # can come from a different pooled connection. transaction guarantees that.
+    transaction do
+      execute(sql, values)
+      last_id = last_insert_row_id
+      count = records.size
+      (last_id - count + 1..last_id).to_a
+    end
   end
   
   def update_records(query, data)
-    prepared_data = prepare_data(data, query[:model_name])
+    prepared_data = prepare_data(stamp_timestamps(data, query[:model_name], :update), query[:model_name])
     set_clause = prepared_data.keys.map { |k| "#{k} = ?" }.join(', ')
     
     full_query = {
@@ -89,23 +95,19 @@ module SqliteQuery
   private
   
   def execute_prepared(sql, params = [])
-    @connection_pool.with do |conn|
+    converted_params = convert_params(params)
+    conn = Thread.current[:dami_sqlite_connection]
+    return run_prepared(conn, sql, converted_params) if conn
+    @connection_pool.with { |c| run_prepared(c, sql, converted_params) }
+  rescue SQLite3::Exception => e
+    handle_sqlite_error(e, sql: sql)
+  end
+
+  def run_prepared(conn, sql, converted_params)
+    begin
       cache = conn.instance_variable_get(:@statement_cache)
       stmt = cache[sql] ||= conn.prepare(sql)
       stmt.reset!
-      
-      converted_params = params.map do |param|
-        case param
-        when Time
-          param.utc.strftime('%Y-%m-%d %H:%M:%S')
-        when Date
-          param.to_s
-        when TrueClass, FalseClass
-          param ? 1 : 0
-        else
-          param
-        end
-      end
       
       results = stmt.execute(converted_params)
       
@@ -140,8 +142,9 @@ module SqliteQuery
     
     if !base_sql && query[:joins] && !query[:joins].empty?
       query[:joins].each do |join|
-        join_table = join[:table]
+        join_table = validate_identifier(join[:table])
         join_conditions = join[:conditions]
+        join_conditions.each { |l, r| validate_identifier(l); validate_identifier(r) }
         
         join_type_sql = case join[:type]
         when :left then "LEFT OUTER JOIN"
@@ -176,20 +179,24 @@ module SqliteQuery
     [sql_parts.join(' '), params]
   end
 
-  def build_where_clause(conditions)
+def build_where_clause(conditions)
     clauses = []
     params = []
     
     conditions.each_with_index do |(type, cond_part), index|
       join_word = (index > 0) ? type.to_s.upcase : ""
 
-      if cond_part.is_a?(Array)
-        # Handles nested .where { |q| q.where(...).or(...) } blocks
+      if cond_part.is_a?(Array) && cond_part.first.is_a?(String) && cond_part.first.include?('?')
+        # This is a raw SQL fragment like ['age > ?', 30]
+        clauses << "#{join_word} #{cond_part.first}".strip
+        params.concat(cond_part[1..-1])
+      elsif cond_part.is_a?(Array)
+        # This is a nested block of conditions
         sub_clause, sub_params = build_where_clause(cond_part)
         clauses << "#{join_word} (#{sub_clause})".strip unless sub_clause.empty?
         params.concat(sub_params)
       elsif cond_part.is_a?(Hash)
-        # This is the corrected logic for handling hashes
+        # This is a hash of conditions
         hash_clauses = []
         hash_params = []
         cond_part.each do |field, value|
@@ -199,7 +206,6 @@ module SqliteQuery
         end
         
         unless hash_clauses.empty?
-          # Join all conditions from this hash with AND and wrap in parentheses
           full_clause = "(#{hash_clauses.join(' AND ')})"
           clauses << "#{join_word} #{full_clause}".strip
           params.concat(hash_params)
@@ -211,6 +217,7 @@ module SqliteQuery
   end
 
 def build_condition_part(field, value)
+    validate_identifier(field)
     case value
     when nil then ["#{field} IS NULL", []]
     when Hash
@@ -285,18 +292,41 @@ def build_condition_part(field, value)
   end
     
   def prepare_data(data, model_name)
-    data.transform_values do |value|
-      case value
-      when Time
-        value.utc.strftime('%Y-%m-%d %H:%M:%S')
-      when Date
-        value.to_s
-      when TrueClass, FalseClass
-        value ? 1 : 0
+    model_config = Dami.find_model(model_name) rescue nil
+    data.each_with_object({}) do |(key, value), out|
+      validate_identifier(key)
+      field_type = model_config&.dig(:fields, key.to_sym, :type)
+      out[key] = if field_type == :json
+        value.nil? ? nil : JSON.generate(value)
       else
-        value
+        convert_value(value)
       end
     end
+  end
+
+  # Fills created_at / updated_at when the model declares them and the caller
+  # did not supply a value. Operation is :create or :update.
+  def stamp_timestamps(data, model_name, operation)
+    model_config = Dami.find_model(model_name) rescue nil
+    return data unless model_config
+    fields = model_config[:fields] || {}
+    now = Time.now.utc
+    data = data.dup
+    if operation == :create && fields.key?(:created_at) && !data.key?(:created_at)
+      data[:created_at] = now
+    end
+    if fields.key?(:updated_at) && !data.key?(:updated_at)
+      data[:updated_at] = now
+    end
+    data
+  end
+
+  # Column and table names are interpolated into SQL, so they must be plain
+  # identifiers. Values are always bound; this guards the names.
+  def validate_identifier(name)
+    str = name.to_s
+    return str if str.match?(/\A[A-Za-z_][\w.]*\z/)
+    raise Dami::InvalidIdentifier, "Invalid SQL identifier: #{str.inspect}"
   end
 
   def convert_row(row, model_name, select_columns = nil)
@@ -304,8 +334,12 @@ def build_condition_part(field, value)
     model_config = Dami.find_model(model_name) rescue nil
     converted_row = row.each_with_object({}) do |(key, value), hash|
       key = key.to_sym
-      field_config = model_config&.dig(:fields, key)
-      hash[key] = (field_config && field_config[:type] == :boolean && !value.nil?) ? (value == 1) : value
+      field_type = model_config&.dig(:fields, key, :type)
+      hash[key] = case field_type
+                  when :boolean then value.nil? ? nil : (value == 1 || value == true)
+                  when :json then value.nil? ? nil : (JSON.parse(value) rescue value)
+                  else value
+                  end
     end
     if select_columns && !select_columns.empty?
       selected_keys = select_columns.map do |col|

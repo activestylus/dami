@@ -45,7 +45,7 @@ def process_nested_records(attr_key, config, records_data, mode)
   raise "Undefined has_many association '#{assoc_name}' for nested attributes" unless child_rel
   
   child_model_name = child_rel[:model] || assoc_name
-  foreign_key = child_rel[:foreign_key] || "#{@parent_model_name.to_s.singularize}_id".to_sym
+  foreign_key = child_rel[:foreign_key] || "#{Dami::Inflector.singularize(@parent_model_name.to_s)}_id".to_sym
   
   # Preserve the original keys when processing hashes
   if records_data.is_a?(Hash)
@@ -62,33 +62,38 @@ def process_nested_records(attr_key, config, records_data, mode)
 end
 
 def process_single_record(attr_key, index_key, child_model_name, foreign_key, config, child_attrs, mode)
-  child_attrs = child_attrs.transform_keys(&:to_sym)
-  id = child_attrs[:id]
-  destroy = ['true', '1', true].include?(child_attrs[:_destroy])
-  grandchild_attrs = extract_grandchild_attributes(child_model_name, child_attrs)
-  if mode == :validate || !destroy
-    validate_record(child_model_name, child_attrs, grandchild_attrs, attr_key, index_key, id)
-  end
+          child_attrs = child_attrs.transform_keys(&:to_sym)
+          
+          # FIX 1: Ensure ID is always an integer if present for reliable lookups.
+          id = child_attrs[:id]&.to_i
+          destroy = ['true', '1', true].include?(child_attrs[:_destroy])
 
-  if mode == :save
-    if destroy && config[:allow_destroy] && id
-      @to_delete[child_model_name] << id
-    elsif !destroy
-      if id
-        @to_update[child_model_name][id] = { 
-          attrs: child_attrs, 
-          grandchildren: grandchild_attrs 
-        }
-      else
-        child_attrs[foreign_key] = @parent_record[:id]
-        @to_create[child_model_name] << { 
-          attrs: child_attrs, 
-          grandchildren: grandchild_attrs 
-        }
-      end
-    end
-  end
-end
+          # FIX 2 (Security): On update/destroy, verify the child record belongs to the parent.
+          if id && mode == :save
+            existing_record = Dami.db(child_model_name).find(id)
+            # If the record doesn't exist OR its foreign key doesn't match the parent, ignore it.
+            return unless existing_record && existing_record[foreign_key] == @parent_record[:id]
+          end
+
+          grandchild_attrs = extract_grandchild_attributes(child_model_name, child_attrs)
+          
+          if mode == :validate || !destroy
+            validate_record(child_model_name, child_attrs, grandchild_attrs, attr_key, index_key, id)
+          end
+
+          if mode == :save
+            if destroy && config[:allow_destroy] && id
+              @to_delete[child_model_name] << id
+            elsif !destroy
+              if id
+                @to_update[child_model_name][id] = { attrs: child_attrs, grandchildren: grandchild_attrs }
+              else
+                child_attrs[foreign_key] = @parent_record[:id]
+                @to_create[child_model_name] << { attrs: child_attrs, grandchildren: grandchild_attrs }
+              end
+            end
+          end
+        end
 
 def validate_record(child_model_name, child_attrs, grandchild_attrs, attr_key, index_key, id)
   child_errors = {}

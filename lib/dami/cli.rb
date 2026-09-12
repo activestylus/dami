@@ -43,7 +43,15 @@ module Dami
       puts "✅ Migrations complete. Schema has been updated in #{Dami.configuration.schema_path}."
     end
     
-    desc "schema:dump", "Generate a schema file from the current database state"
+    desc "rollback [STEPS]", "Revert the last migration (or the last STEPS migrations)"
+    def rollback(steps = 1)
+      load_user_app
+      db = Dami.database(:default)
+      Dami::Migrator.new(db).rollback(steps.to_i)
+      puts "✅ Rolled back #{steps} migration(s). Schema has been updated in #{Dami.configuration.schema_path}."
+    end
+
+    desc "schema_dump", "Generate a schema file from the current database state"
     def schema_dump
       load_user_app
       puts "Dumping schema..."
@@ -86,7 +94,7 @@ module Dami
   # 4. Finally, reopen the main CLI class to add the subcommands.
   #    This works because `DB` and `Generate` are now fully defined.
   class CLI < Thor
-    desc "db", "Manage database tasks (migrate, schema:dump)"
+    desc "db", "Manage database tasks (migrate, rollback, schema_dump)"
     subcommand "db", DB
 
     desc "generate", "Generate new files (e.g., migrations)"
