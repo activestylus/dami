@@ -132,6 +132,18 @@ class ActionsTest < Minitest::Test
     end
   end
 
+  def test_command_validation_can_query_the_database
+    @db[:users].create(first_name: 'Taken', last_name: 'D', email: 'taken@test.com', status: 'active')
+    klass = Class.new(Dami::Command) do
+      validate :name_is_unique, error: "Name is taken" do
+        db(:users).where(first_name: data[:first_name]).none?
+      end
+    end
+
+    refute klass.new(original: {}, data: { first_name: 'Taken' }, context: {}).call.valid?
+    assert klass.new(original: {}, data: { first_name: 'Free' }, context: {}).call.valid?
+  end
+
   def test_flow_succeeds_and_runs_hooks
     side_effect_run = false
     Dami.flow :create_user do

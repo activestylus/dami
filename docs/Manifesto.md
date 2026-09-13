@@ -139,30 +139,24 @@ end
 Dami replaces this invisible chaos with **explicit, readable, transactional workflows**:
 
 ```ruby
-Dami.flow :user_onboarding do |params|
-  step :create_user do
-    user = db[:users].create(params)
-    set(:user, user)
+Dami.flow :user_onboarding do
+  user = db(:users).create(params)
+
+  perform "Activate subscription", retry_options: { on: [Stripe::APIError], times: 2 } do
+    Stripe.create_subscription(customer: user[:email])
   end
-  
-  step :send_welcome_email do
-    UserMailer.welcome(get(:user)[:email]).deliver
-  end
-  
-  step :track_analytics do
-    Analytics.track('signup', user_id: get(:user)[:id])
-  end
-  
-  step :activate_subscription do
-    Stripe.create_subscription(customer: get(:user)[:email])
-  end
+
+  succeed with: user, and_then: [
+    -> { UserMailer.welcome(user[:email]).deliver },
+    -> { Analytics.track('signup', user_id: user[:id]) }
+  ]
 end
 
 # Execute the entire workflow
-Dami.run(:user_onboarding, name: 'Alice', email: 'alice@example.com')
+Dami.run(:user_onboarding, params: { name: 'Alice', email: 'alice@example.com' })
 ```
 
-What happens if step 3 fails? **The entire transaction rolls back.** Your database stays consistent. Your user doesn't get created. No orphaned records. No mystery states.
+What happens if Stripe fails? **The entire transaction rolls back.** Your database stays consistent. Your user doesn't get created. No orphaned records. No mystery states.
 
 This is the **Dami Guarantee**: atomic workflows or nothing.
 

@@ -175,8 +175,7 @@ def test_update_with_mixed_nested_operations
     assert_includes comment_contents, 'Updated Existing Comment'
     assert_includes comment_contents, 'A Brand New Comment'
     
-    # THE FIX: This is a more robust check than find(id).
-    # It ensures no comment with the old content exists for this post.
+    # No comment with the old content may remain for this post.
     refute_includes comment_contents, 'Delete Me', "The 'Delete Me' comment should have been destroyed"
   end
 

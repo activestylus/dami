@@ -24,7 +24,7 @@ def self.clear_all!
 
 def self.present(model_name, &block)
   presenter_module = Module.new
-  presenter_module.module_eval(&block)  # Changed from instance_eval
+  presenter_module.module_eval(&block)
   (@presenter_modules ||= {})[model_name] = presenter_module
 end
 

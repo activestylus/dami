@@ -4,8 +4,7 @@ require_relative 'test_helper'
 class CoreTest < Minitest::Test
   def setup
     super
-    # This test file uses a simplified local model, which is fine.
-    # It now correctly uses the new schema.
+    # A simplified local model.
     Dami.model :users do
       fields do
         field :first_name, :string

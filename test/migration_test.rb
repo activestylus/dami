@@ -37,12 +37,18 @@ class MigrationTest < Minitest::Test
     refute @adapter.table_exists?(:users)
   end
 
-   def test_create_table_and_reverse
+  def test_execute_runs_raw_sql_with_params
     migration = Dami::Migration.new(@adapter)
-    # ... (this test remains the same, no changes needed)
+    migration.create_table(:users) { |t| t.field(:name, :string); t.field(:status, :string) }
+    @adapter.execute("INSERT INTO users (name) VALUES ('a'), ('b')")
+
+    migration.execute("UPDATE users SET status = ? WHERE status IS NULL", ['active'])
+    migration.execute("CREATE TRIGGER users_no_blank_name BEFORE INSERT ON users BEGIN SELECT RAISE(ABORT, 'name required') WHERE NEW.name IS NULL; END")
+
+    assert_equal 2, @adapter.execute("SELECT COUNT(*) AS n FROM users WHERE status = 'active'").first['n']
+    assert_raises(Dami::Error, SQLite3::Exception) { @adapter.execute("INSERT INTO users (status) VALUES ('x')") }
   end
 
-  # ADD a new test for indexes
   def test_add_and_remove_index
     # First, create a table to work with
     @adapter.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT);")

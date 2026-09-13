@@ -69,7 +69,6 @@ def create_many(records, permit: [], protect: true)
       
       prepared_records << prepared[:db_parent_attrs]
     rescue Dami::ValidationError => e
-      # FIX: Just store the error object, not try to set errors
       all_errors[index] = e.errors
     rescue Dami::ProtectionError, Dami::UnknownFieldsError => e
       raise e
@@ -78,7 +77,6 @@ def create_many(records, permit: [], protect: true)
   
   # If ANY validations failed, raise with collected errors
   unless all_errors.empty?
-    # FIX: Create a custom message and pass errors in the initializer
     message = "Validation failed for #{all_errors.size} record(s): " + 
               all_errors.map { |idx, errs| "Record #{idx}: #{errs}" }.join("; ")
     raise Dami::ValidationError.new(message, all_errors)

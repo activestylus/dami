@@ -35,6 +35,16 @@ class DraftTest < Minitest::Test
     assert_equal 'John', user[:first_name]
   end
 
+  def test_draft_can_query_the_database
+    @db[:users].create(first_name: 'Taken', last_name: 'D', email: 'taken@test.com', status: 'active')
+    result = @db[:users].create(first_name: 'Taken', last_name: 'E', email: 'other@test.com', status: 'active') do |d|
+      d.verify(:name_is_unique, error: "This name is already taken") { db(:users).where(first_name: d.get(:first_name)).none? }
+    end rescue result = $!
+    assert_kind_of Dami::ValidationError, result
+    assert_equal({ name_is_unique: ["This name is already taken"] }, result.errors)
+    assert_equal 1, @db[:users].where(first_name: 'Taken').count
+  end
+
   def test_create_with_failing_draft_raises_error
     assert_raises(Dami::ValidationError) do
       # Fails because first_name is required by the global validation

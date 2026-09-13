@@ -32,7 +32,7 @@ module Dami
       'paralysis' => 'paralyses', 'parenthesis' => 'parentheses', 'synopsis' => 'synopses',
       'thesis' => 'theses', 'phenomenon' => 'phenomena', 'criterion' => 'criteria',
       'datum' => 'data',
-      # Add the common -s words as irregular to handle them explicitly
+      # common -s words, listed as irregular so they are handled explicitly
       'bus' => 'buses', 'gas' => 'gases', 'lens' => 'lenses', 'glass' => 'glasses',
       'class' => 'classes', 'mass' => 'masses', 'grass' => 'grasses', 'brass' => 'brasses',
       'canvas' => 'canvases', 'atlas' => 'atlases', 'bias' => 'biases', 'cosmos' => 'cosmoses',

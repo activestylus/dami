@@ -51,7 +51,7 @@ class SchemaToolsTest < Minitest::Test
   end
 
   def test_model_introspector_builds_correctly
-    # THE FIX: Reset the global model registry to isolate this test.
+    # Reset the global model registry to isolate this test.
     Dami.instance_variable_set(:@models, {})
 
     # Define models that represent our expected schema

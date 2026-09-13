@@ -10,7 +10,7 @@ module Dami
 
         timestamp = Time.now.utc.strftime('%Y%m%d%H%M%S')
         
-        # THE FIX: This converts "AddEmailToUsers" into "add_email_to_users"
+        # "AddEmailToUsers" -> "add_email_to_users"
         snake_case_name = name.gsub(/::/, '/')
                               .gsub(/([A-Z]+)([A-Z][a-z])/,'\1_\2')
                               .gsub(/([a-z\d])([A-Z])/,'\1_\2')

@@ -47,11 +47,14 @@ module Dami
         adapter.query_exists?(build_query_structure)
       end
 
+      def none?
+        !any?
+      end
+
       def exists?(conds = nil)
         conds ? where(conds).any? : any?
       end
 
-      # This is the updated method
       def count
         adapter.count_records(build_query_structure)
       end

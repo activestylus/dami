@@ -137,11 +137,13 @@ Dami compares model to schema. Writes perfect, reversible migrations. **The tedi
 Rails callbacks scatter logic across time and space. Dami makes business logic **explicit and atomic:**
 
 ```ruby
-Dami.flow :user_onboarding do |params|
-  step :create_user { db[:users].create(params) }
-  step :send_email { Mailer.welcome(user) }
-  step :track_event { Analytics.track('signup') }
-  step :sync_crm { CRM.sync(user) }
+Dami.flow :user_onboarding do
+  user = db(:users).create(params)
+  perform("Sync CRM") { CRM.sync(user) }
+  succeed with: user, and_then: [
+    -> { Mailer.welcome(user) },
+    -> { Analytics.track('signup') }
+  ]
 end
 ```
 
@@ -315,10 +317,12 @@ Dami.behavior :users do
 end
 
 # Flow
-Dami.flow :signup do |params|
-  step(:create) { db[:users].create(params) }
-  step(:email) { Mailer.welcome(user) }
-  step(:track) { Analytics.track('signup') }
+Dami.flow :signup do
+  user = db(:users).create(params)
+  succeed with: user, and_then: [
+    -> { Mailer.welcome(user) },
+    -> { Analytics.track('signup') }
+  ]
 end
 ```
 

@@ -32,5 +32,9 @@ module Dami
     def valid?
       @errors.empty?
     end
+    # The database, so a verify block can check it: db(:accounts).where(name: get(:name)).none?
+    def db(model_name)
+      Dami.db(model_name)
+    end
   end
 end

@@ -15,7 +15,7 @@ module Dami
       def load_from_path(path)
         return unless File.exist?(path)
         
-        # THE FIX: Capture `self` (the loader instance) into a variable.
+        # Capture `self` (the loader instance) into a variable.
         loader_instance = self
         
         # Now, the monkey-patched method uses the captured variable, ensuring

@@ -8,7 +8,7 @@ def setup_benchmark_database
   FileUtils.rm_f(db_path)
   Dami.connect(:benchmark, adapter: :sqlite, path: db_path)
 
-  # THE FIX: Explicitly associate the models with the :benchmark database.
+  # The models use the :benchmark database explicitly.
   Dami.model(:users) do
     database :benchmark
     fields { field :name, :string }
@@ -28,7 +28,7 @@ def setup_benchmark_database
   puts "Setting up benchmark database with 1,000 users and 10,000 posts..."
   
   users_to_create = (1..1000).map { |i| { name: "User #{i}" } }
-  # THE FIX: Use the standard Dami API, not the raw connection.
+  # Through the Dami API, not the raw connection.
   Dami.db(:users).create_many(users_to_create)
   
   posts_to_create = (1..1000).flat_map do |user_id|

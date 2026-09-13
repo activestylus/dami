@@ -15,20 +15,19 @@ module Dami
       halt(Dami::Failure.new(command.errors)) unless command.valid?
       command.data
     end
-    # THE FIX IS HERE: Renamed 'retry:' to 'retry_options:'
+    # A step that talks to the outside world. retry_options: { on: [SomeError], times: 2 }
+    # retries that many times on those exceptions; timeout: is in seconds.
     def perform(name, retry_options: {}, timeout: nil, &block)
       action = -> do
-        # THE FIX: Use the new parameter name 'retry_options'
         retry_exceptions = Array(retry_options[:on])
-        # Add 1 for the initial attempt.
-        max_attempts = (retry_options[:times] || 0) + 1
+        max_attempts = (retry_options[:times] || 0) + 1   # the first attempt plus the retries
         attempts = 0
         begin
           attempts += 1
           block.call
         rescue *retry_exceptions => e
           raise if attempts >= max_attempts
-          retry # This 'retry' keyword is correct because it's inside the rescue block
+          retry
         end
       end
       if timeout

@@ -3,7 +3,7 @@ require_relative 'test_helper'
 class PolymorphicTest < Minitest::Test
   def setup
     super
-    # THE FIX: Make this test self-contained.
+    # Self-contained models.
     Dami.model(:users) { fields { field :first_name, :string } }
     Dami.model(:posts) { fields { field :user_id, :integer; field :title, :string }; relationships { has_many comments: { as: :commentable, model: :comments } } }
     Dami.model(:articles) { fields { field :name, :string }; relationships { has_many comments: { as: :commentable, model: :comments } } }
@@ -16,7 +16,6 @@ class PolymorphicTest < Minitest::Test
     @comment2 = @db[:comments].create(content: "On Article", commentable_id: @article[:id], commentable_type: "Article")
   end
 
-  # No changes needed to the test methods themselves
   def test_lazy_load_polymorphic_belongs_to
     comment = @db[:comments].find(@comment1[:id])
     assert_equal "My Post", comment.commentable[:title]

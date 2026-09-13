@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.0.1] - 2026-09-13
+
+Found while building the first app on 1.0.0 (a finance app on aris + dami, 98 tests), then a full read of the docs against the source.
+
+### 🐛 Correctness
+
+* **Text arriving as binary is stored as text.** Rack hands a web app its params as ASCII-8BIT strings, and the sqlite3 gem binds a binary string as a BLOB, which never equals the TEXT it looks like: the row is written, then `where(name: params['name'])` finds nothing. A binary string whose bytes are valid UTF-8 is now bound as text on every path (`execute`, `get_first_row`, prepared statements, inserts). Bytes that are not valid UTF-8 (an image, a PDF) still go in as a BLOB.
+* **`Migration#execute` exists.** The docs listed it; the class did not define it. `execute(sql, params = [])` runs raw SQL inside the migration's transaction: triggers, views, PRAGMAs, data fixes.
+* **`db(:model)` inside `Command` validations and `Draft` blocks.** The docs' `verify :name_is_unique` examples called `db(...)` from inside a block that is `instance_exec`'d on the draft or command, where no `db` existed. Both have it now.
+* **`none?` on a query**, the opposite of `any?`. The docs used it; the builder did not have it.
+
+### 📚 Docs
+
+* Chapter 10 (Drafts, Flows & Commands) now shows the real API: `Dami.flow :name do ... end` + `Dami.run(:name, **params)` (the chapter showed a `Dami.run(context: ...) do |run_context|` form that never existed), `draft.transform` / `draft.apply` (not `draft.prepare`), `perform ..., retry_options: { on:, times: }` (not `retry:`), `and_then:` takes callables, results are `Success`/`Failure` with `value` / `error`. Draft blocks are on `create` and `update`, not `delete`. The flow snippets in `Manifesto.md` and `site.md` showed a `step` DSL that does not exist; they use the real one now.
+* Chapter 12 (The Dami Way): an AI reply that had been pasted in above the chapter ("Absolutely. This is the perfect way to end the documentation…") is gone, together with the ````markdown fence that rendered the chapter's opening as a code block. Its examples use `protection` (there is no `before(:save)`) and the real flow API.
+* Chapter 5: `when:` is equality only; use `if:` for anything else. Chapter 9: `execute` signature. Chapter 3: `none?`. Chapter 8/9: the link to chapter 10 names the right chapter.
+* Stray "THE FIX:" / "no changes needed" comments left by AI-assisted editing removed from `lib/` and `test/`. One of them was an empty duplicate `test_create_table_and_reverse` that shadowed the real test; the real one runs again.
+
+### ✅ Tests
+
+284 tests. New: `test/encoding_test.rb` (binary text stored as TEXT and matching in `where`; non-UTF-8 bytes stay a BLOB), `Migration#execute` with params and a trigger, `db` from a draft and from a command validation.
+
 ## [1.0.0] - 2026-09-12 (pre-publish review pass)
 
 Fixes applied after a full review of the 1.0.0 working tree, before the first

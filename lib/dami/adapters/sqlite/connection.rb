@@ -87,6 +87,7 @@ module SqliteConnection
 
   def convert_value(value)
     case value
+    when String then text_or_blob(value)
     when Time then value.utc.strftime('%Y-%m-%d %H:%M:%S')
     when DateTime then value.to_time.utc.strftime('%Y-%m-%d %H:%M:%S')
     when Date then value.to_s
@@ -94,6 +95,17 @@ module SqliteConnection
     when Hash, Array then JSON.generate(value)
     else value
     end
+  end
+
+  # Rack hands a web app its params as ASCII-8BIT strings, and the sqlite3 gem
+  # binds a binary string as a BLOB, which never equals the TEXT it looks like:
+  # the row is written, then `where(name: params['name'])` finds nothing. A
+  # binary string whose bytes are valid UTF-8 is text, so it is bound as text.
+  # Bytes that are not valid UTF-8 (an image, a PDF) still go in as a BLOB.
+  def text_or_blob(value)
+    return value unless value.encoding == Encoding::ASCII_8BIT
+    text = value.dup.force_encoding(Encoding::UTF_8)
+    text.valid_encoding? ? text : value
   end
 
   def handle_sqlite_error(error, sql: nil)

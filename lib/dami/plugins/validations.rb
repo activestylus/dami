@@ -18,10 +18,9 @@ def validate(value, rule_name, params = [], context = {})
           rule_config = rule.is_a?(Proc) ? rule.call(*params) : rule
           check = rule_config[:check]
           
-          # --- THE FIX: Use the new Dami.translate system ---
           # 1. Use an inline message if provided directly in the rule definition.
           message = rule_config[:message]
-          # 2. Otherwise, fetch it from the new localization system.
+          # 2. Otherwise, fetch it from the localization system.
           message ||= Dami.translate("validations.#{rule_name}", *params)
           # 3. Use a generic fallback if no translation is found.
           message ||= "is invalid"

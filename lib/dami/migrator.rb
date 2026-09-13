@@ -10,7 +10,7 @@ module Dami
     
     def migrate
       pending_migrations.each { |m| run_migration(m) }
-      dump_schema # ADD THIS LINE
+      dump_schema
     end
     
     def rollback(steps = 1)
@@ -69,7 +69,6 @@ module Dami
     def run_migration(migration_info)
       migration = load_migration(migration_info[:file])
       @adapter.transaction do
-        # THE FIX: Call the new method name.
         migration.up
         @adapter.insert_record(:schema_migrations, { version: migration_info[:version] })
       end
@@ -78,7 +77,6 @@ module Dami
     def reverse_migration(migration_info)
       migration = load_migration(migration_info[:file])
       @adapter.transaction do
-        # THE FIX: Call the new method name.
         migration.down
         
         @adapter.execute(

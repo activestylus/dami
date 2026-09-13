@@ -6,7 +6,7 @@ class HasManyThroughTest < Minitest::Test
   def setup
     super
     
-    # THE FIX: Define all necessary models locally to make the test self-contained.
+    # All models defined locally so the test is self-contained.
     Dami.model :posts do
       fields { field :title, :string }
       relationships { has_many :posts_tags; has_many :tags, through: :posts_tags }

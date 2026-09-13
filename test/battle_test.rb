@@ -16,8 +16,7 @@ class ConcurrencyBattleTest < Minitest::Test
     
     threads = 20.times.map do
       Thread.new do
-        # --- THE FIX IS HERE ---
-        # Add a retry mechanism to handle SQLite's busy exceptions.
+        # Retry on SQLite's busy exceptions.
         retries = 0
         begin
           @db.transaction do
@@ -62,7 +61,6 @@ class AssociationBattleTest < Minitest::Test
     Dami.model :employees do
       fields { field :name, :string; field :manager_id, :integer }
       relationships do
-        # THE FIX IS HERE: Removed the hyphen before :manager
         belongs_to :manager, model: :employees, foreign_key: :manager_id
         has_many :reports, model: :employees, foreign_key: :manager_id
       end

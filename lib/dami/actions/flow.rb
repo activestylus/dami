@@ -17,7 +17,6 @@ module Dami
       @after_commit_hooks = []
     end
 
-    # Fix: Ensure the method accepts the context parameter
     def call(context)
       context.instance_exec(&@block)
     rescue => e

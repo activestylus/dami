@@ -21,7 +21,6 @@ class LocalizationTest < Minitest::Test
     assert_equal "cannot be blank", Dami.translate("validations.required")
   end
 
-  # THE FIX: This test now uses the corrected `with_locale` helper and will pass.
   def test_localization_can_be_scoped_by_language
     Dami.localize :validations do
       es do

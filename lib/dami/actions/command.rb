@@ -44,6 +44,10 @@ module Dami
       sym_field = field.to_sym
       @data.key?(sym_field) && @original[sym_field] != @data[sym_field]
     end
+    # The database, so a validation can check it: db(:accounts).where(name: data[:name]).none?
+    def db(model_name)
+      Dami.db(model_name)
+    end
     private
     def validate_required_context!
       missing = (self.class.instance_variable_get(:@required_context) || []) - @context.keys
@@ -66,11 +70,10 @@ module Dami
         end
       end
     end
-def run_transformations
+    def run_transformations
       current_data = @data.dup
       (self.class.instance_variable_get(:@transformations) || []).each do |t|
-        # THE FIX: Each transform block returns a hash of changes.
-        # We must MERGE these changes into the current data hash.
+        # Each transform block returns a hash of changes, merged into the data.
         result = instance_exec(current_data, &t[:block])
         current_data.merge!(result) if result.is_a?(Hash)
       end

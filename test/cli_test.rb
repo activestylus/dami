@@ -50,7 +50,6 @@ class CliTest < Minitest::Test
     File.write(File.join(@app_root, 'app', 'models', 'user.rb'), model_definition)
     
     # d. Define the path to our CLI executable.
-    # THE FIX: Correct the path from `../../` to `../`
     cli_path = File.expand_path('../bin/dami', __dir__)
 
     # --- ACT ---
